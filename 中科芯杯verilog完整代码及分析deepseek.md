@@ -650,3 +650,105 @@ endmodule
 ```
 
 **总结**：通过模块化设计、资源复用和流水线优化，实现符合要求的张量计算单元。需要详细处理不同数据精度的转换和混合计算模式，同时确保时序满足200MHz的要求。
+
+
+
+
+
+#### **结构图分析**
+以下是基于Verilog代码的模块连接图，采用Mermaid语法表示各模块间的交互关系：
+
+---
+
+```mermaid
+graph TD
+    %% 顶层模块
+    TC([Tensor Core]) --> AXI4_SLAVE
+    TC --> AXI4_MASTER
+    TC --> APB_CONFIG
+    TC --> COMPUTE_CORE
+
+    %% AXI4 Slave接口模块
+    AXI4_SLAVE([AXI4 Slave接口]) -->|写入数据| BUFFER_A[Buffer A]
+    AXI4_SLAVE -->|写入数据| BUFFER_B[Buffer B]
+    AXI4_SLAVE -->|写入数据| BUFFER_C[Buffer C]
+    AXI4_SLAVE -->|配置寄存器| CONFIG_REG[Config Registers]
+
+    %% APB配置接口模块
+    APB_CONFIG([APB配置接口]) -->|配置参数| CONFIG_REG
+    APB_CONFIG -->|启动信号| CTRL_LOGIC[控制逻辑]
+
+    %% 计算核心模块
+    COMPUTE_CORE([计算核心]) -->|读取数据| BUFFER_A
+    COMPUTE_CORE -->|读取数据| BUFFER_B
+    COMPUTE_CORE -->|读取数据| BUFFER_C
+    COMPUTE_CORE -->|写入结果| BUFFER_D[Buffer D]
+    COMPUTE_CORE -->|混合精度控制| MULTIPLIER[可配置乘法器]
+    COMPUTE_CORE -->|累加模式控制| ACCUMULATOR[混合精度累加器]
+    COMPUTE_CORE -->|稀疏掩码（可选）| SPARSE_MODULE[稀疏计算模块]
+
+    %% AXI4 Master接口模块
+    AXI4_MASTER([AXI4 Master接口]) -->|突发写回| BUFFER_D
+
+    %% 控制逻辑
+    CTRL_LOGIC -->|状态机协调| COMPUTE_CORE
+    CTRL_LOGIC -->|分块调度| AXI4_MASTER
+
+    %% 数据流标注
+    classDef module fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef buffer fill:#ccf,stroke:#333,stroke-width:1px;
+    classDef config fill:#fcc,stroke:#333,stroke-width:1px;
+    class AXI4_SLAVE,AXI4_MASTER,APB_CONFIG,COMPUTE_CORE module;
+    class BUFFER_A,BUFFER_B,BUFFER_C,BUFFER_D buffer;
+    class CONFIG_REG,CTRL_LOGIC config;
+```
+
+---
+
+### **模块连接图说明**
+
+1. **顶层模块（Tensor Core）**  
+   - 包含四个子模块：`AXI4 Slave接口`、`AXI4 Master接口`、`APB配置接口`、`计算核心`。
+
+2. **AXI4 Slave接口**  
+   - **输入数据流**：接收外部输入的矩阵A、B、C，写入内部缓冲区（`Buffer A/B/C`）。  
+   - **配置寄存器**：将CPU/DMA的配置参数（如矩阵尺寸、精度模式）写入`Config Registers`。
+
+3. **APB配置接口**  
+   - **配置参数传递**：通过APB总线设置`Config Registers`，并发送启动信号到`控制逻辑`。  
+   - **低功耗控制**：动态调整计算模式（如FP16混合精度、INT8等）。
+
+4. **计算核心**  
+   - **数据读取**：从`Buffer A/B/C`加载输入矩阵。  
+   - **计算单元**：  
+     - **可配置乘法器**：根据`Config Registers`选择INT4/INT8/FP16/FP32精度。  
+     - **混合精度累加器**：支持FP32累加（如FP16乘法+FP32累加）。  
+     - **稀疏计算模块（可选）**：根据掩码压缩输入数据（如4:2稀疏模式）。  
+   - **结果写回**：计算结果存入`Buffer D`，供AXI4 Master写回DDR。
+
+5. **AXI4 Master接口**  
+   - **突发传输**：将`Buffer D`中的结果通过AXI4突发传输写回外部存储。
+
+6. **控制逻辑**  
+   - **状态机协调**：管理计算核心的状态（空闲、计算中、数据搬运）。  
+   - **分块调度**：将大矩阵分块，协调AXI4 Master预取下一批数据。
+
+---
+
+### **关键信号标注**
+| 信号类型         | 示例信号                     | 功能说明                     |
+|------------------|----------------------------|----------------------------|
+| **数据信号**     | `buffer_a[0:255]`          | 输入矩阵A的缓冲区           |
+| **配置信号**     | `config_reg[0][1:0]`       | 数据精度模式（INT4/FP32等） |
+| **控制信号**     | `start_compute`            | 启动计算标志                |
+| **状态信号**     | `compute_done`             | 计算完成标志                |
+| **稀疏信号**     | `sparse_mask[7:0]`         | 4:2稀疏掩码（可选）         |
+
+---
+
+### **总结**
+此图展示了张量计算单元内部各模块的连接关系与数据流向，突出了以下设计特点：  
+1. **模块化分层**：接口、计算、控制逻辑分离，便于扩展与维护。  
+2. **数据重用**：通过双缓冲区和突发传输隐藏DDR访问延迟。  
+3. **灵活配置**：支持多精度计算和混合模式，硬件资源复用优化。  
+4. **稀疏扩展**：可选稀疏模块降低计算复杂度。

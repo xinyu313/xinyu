@@ -252,6 +252,16 @@ function void generate_test_data(
                   (i << 4) | j;                           // INT模式
     end
     // 类似生成B和C...
+      foreach(B[i,j]) begin
+        B[i][j] = (precision == 2'b11) ? 32'h3F800000 :  // FP32 1.0
+                  (precision == 2'b10) ? 16'h3C00      :  // FP16 1.0
+                  (i << 4) | j;                           // INT模式
+    end
+      foreach(C[i,j]) begin
+        C[i][j] = (precision == 2'b11) ? 32'h3F800000 :  // FP32 1.0
+                  (precision == 2'b10) ? 16'h3C00      :  // FP16 1.0
+                  (i << 4) | j;                           // INT模式
+    end
 endfunction
 
 //---------------------------------------

@@ -1,0 +1,2 @@
+ start /B ssh -fN -L 80:localhost:32223 -p 48024 git@dp.neurotic.win
+start /B ssh -fN -L 32224:localhost:32224 -p 48024 git@dp.neurotic.win
